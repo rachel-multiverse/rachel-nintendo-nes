@@ -1,0 +1,13 @@
+# Build outputs
+build/
+*.nes
+*.o
+
+# Editor files
+*~
+*.swp
+.DS_Store
+
+# Emulator files
+*.sav
+*.srm
