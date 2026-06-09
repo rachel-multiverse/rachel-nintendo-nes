@@ -32,7 +32,11 @@ hand_count:     .res 1
 hand_cursor:    .res 1
 hand_cards:     .res 20
 hand_selected:  .res 20
-msg_sequence:   .res 1
+msg_sequence:   .res 2       ; 16-bit, little-endian in RAM
+player_id:      .res 2       ; assigned by WELCOME (16-bit, LE in RAM)
+game_id:        .res 2       ; assigned by WELCOME (16-bit, LE in RAM)
+observed_hash:  .res 8       ; last GAME_STATE hash, echoed in PLAY/DRAW
+hash_valid:     .res 1       ; 1 once a state hash has been captured
 
 .segment "CODE"
 

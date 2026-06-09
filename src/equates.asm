@@ -39,11 +39,15 @@ BTN_RIGHT   = %00000001
 ; RUBP Protocol
 RUBP_VERSION    = 1
 MSG_HELLO       = $01
-MSG_GAME_STATE  = $10
-MSG_PLAY_CARD   = $20
-MSG_DRAW_CARD   = $21
+MSG_GAME_STATE  = $07
+MSG_PLAY_CARD   = $04
+MSG_DRAW_CARD   = $05
 PAYLOAD_START   = 16
 PAYLOAD_SIZE    = 48
+
+; RachelSpec version this client speaks (negotiated via HELLO/WELCOME)
+SPEC_VERSION_HI = $00
+SPEC_VERSION_LO = $01
 
 ; Platform identification
 PLATFORM_ID_HI  = $00

@@ -9,7 +9,8 @@
 ; -----------------------------------------------------------------------------
 .proc rubp_init
     lda #0
-    sta msg_sequence
+    sta msg_sequence+0
+    sta msg_sequence+1
     rts
 .endproc
 
@@ -38,18 +39,30 @@
     pla
     sta net_buffer_tx+5
 
-    ; Sequence
-    lda msg_sequence
+    ; Sequence (big-endian: high byte first)
+    lda msg_sequence+1
     sta net_buffer_tx+6
-    inc msg_sequence
-
-    ; Flags and reserved
-    lda #0
+    lda msg_sequence+0
     sta net_buffer_tx+7
+    inc msg_sequence
+    bne :+
+    inc msg_sequence+1
+:
+
+    ; Player ID (big-endian)
+    lda player_id+1
     sta net_buffer_tx+8
+    lda player_id+0
     sta net_buffer_tx+9
+
+    ; Game ID (big-endian)
+    lda game_id+1
     sta net_buffer_tx+10
+    lda game_id+0
     sta net_buffer_tx+11
+
+    ; Timestamp = 0
+    lda #0
     sta net_buffer_tx+12
     sta net_buffer_tx+13
     sta net_buffer_tx+14
@@ -91,32 +104,107 @@
     lda #PLATFORM_ID_LO
     sta net_buffer_tx+PAYLOAD_START+17
 
+    ; SpecVersion (big-endian)
+    lda #SPEC_VERSION_HI
+    sta net_buffer_tx+PAYLOAD_START+18
+    lda #SPEC_VERSION_LO
+    sta net_buffer_tx+PAYLOAD_START+19
+
     jsr net_send
     rts
 .endproc
 
 ; -----------------------------------------------------------------------------
 ; Send DRAW message
+; A = reason (0=cannot play, 1=attack penalty)
 ; -----------------------------------------------------------------------------
 .proc send_draw
+    pha                     ; save reason
     lda #MSG_DRAW_CARD
     jsr build_header
     jsr clear_payload
+
+    ; Reason @0
+    pla
+    sta net_buffer_tx+PAYLOAD_START+0
+    ; Count @1 (always 1 for a manual draw)
+    lda #1
+    sta net_buffer_tx+PAYLOAD_START+1
+    ; SpecVersion @2 (big-endian)
+    lda #SPEC_VERSION_HI
+    sta net_buffer_tx+PAYLOAD_START+2
+    lda #SPEC_VERSION_LO
+    sta net_buffer_tx+PAYLOAD_START+3
+    ; Flags @4 + ObservedStateHash @5..12
+    ldx #4
+    jsr write_obs_hash
+
     jsr net_send
     rts
 .endproc
 
 ; -----------------------------------------------------------------------------
+; Write the Flags byte + ObservedStateHash into the TX payload.
+; X = payload offset of the Flags byte; the 8-byte hash follows at X+1..X+8.
+; If no state hash has been captured yet, the (cleared) flag/hash stay zero.
+; -----------------------------------------------------------------------------
+.proc write_obs_hash
+    lda hash_valid
+    beq done
+    lda #$01                ; Flags bit0 = ObservedStateHash present
+    sta net_buffer_tx+PAYLOAD_START,x
+    ldy #0
+copy:
+    inx
+    lda observed_hash,y
+    sta net_buffer_tx+PAYLOAD_START,x
+    iny
+    cpy #8
+    bne copy
+done:
+    rts
+.endproc
+
+; -----------------------------------------------------------------------------
 ; Send PLAY_CARD message
-; A = card to play
+; A = nominated suit ($FF if none). Plays every card flagged in hand_selected.
 ; -----------------------------------------------------------------------------
 .proc send_play_card
-    pha
+    pha                     ; save nominated suit
     lda #MSG_PLAY_CARD
     jsr build_header
     jsr clear_payload
+
+    ; Copy selected cards to payload+1, counting them in Y
+    ldx #0                  ; hand index
+    ldy #0                  ; cards written (cards live at payload+1)
+loop:
+    cpx hand_count
+    beq done
+    lda hand_selected,x
+    beq skip
+    lda hand_cards,x
+    sta net_buffer_tx+PAYLOAD_START+1,y
+    iny
+skip:
+    inx
+    bne loop
+done:
+    ; CardCount @0
+    tya
+    sta net_buffer_tx+PAYLOAD_START+0
+    ; NominatedSuit @33
     pla
-    sta net_buffer_tx+PAYLOAD_START
+    sta net_buffer_tx+PAYLOAD_START+33
+    ; SpecVersion @34 (big-endian)
+    lda #SPEC_VERSION_HI
+    sta net_buffer_tx+PAYLOAD_START+34
+    lda #SPEC_VERSION_LO
+    sta net_buffer_tx+PAYLOAD_START+35
+    ; Flags @36 + ObservedStateHash @37..44
+    ldx #36
+    jsr write_obs_hash
+
     jsr net_send
     rts
 .endproc

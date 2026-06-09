@@ -235,6 +235,7 @@ not_play:
     lda #BTN_SELECT
     jsr button_pressed
     beq not_draw
+    lda #0                  ; reason: cannot play
     jsr send_draw
 not_draw:
     rts
@@ -244,18 +245,9 @@ not_draw:
 ; Play selected cards
 ; -----------------------------------------------------------------------------
 .proc play_selected_cards
-    ; Find first selected card
-    ldx #0
-:   cpx hand_count
-    beq done
-    lda hand_selected,x
-    bne found
-    inx
-    bne :-
-done:
-    rts
-found:
-    lda hand_cards,x
+    ; send_play_card now reads hand_selected itself and plays every flagged
+    ; card; pass the nominated suit ($FF = none, no Ace nomination on NES yet).
+    lda #$FF
     jsr send_play_card
     rts
 .endproc
