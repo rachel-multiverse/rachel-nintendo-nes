@@ -26,8 +26,13 @@ net_buffer_rx:  .res 64
 current_turn:   .res 1
 my_index:       .res 1
 discard_top:    .res 1
-current_suit:   .res 1
-draw_count:     .res 1
+current_suit:   .res 1       ; active suit nomination (GAME_STATE @3)
+draw_count:     .res 1       ; pending draws (GAME_STATE @4)
+direction:      .res 1       ; 0=clockwise, 1=counter-clockwise (GAME_STATE @1)
+deck_count:     .res 1       ; cards left in deck (GAME_STATE @6)
+player_counts:  .res 8       ; card count per player (GAME_STATE @7..14)
+game_over:      .res 1       ; 0=playing, 1=over (GAME_STATE @15)
+winner_index:   .res 1       ; winner seat, 0xFF if none (GAME_STATE @16)
 hand_count:     .res 1
 hand_cursor:    .res 1
 hand_cards:     .res 20
@@ -35,6 +40,8 @@ hand_selected:  .res 20
 msg_sequence:   .res 2       ; 16-bit, little-endian in RAM
 player_id:      .res 2       ; assigned by WELCOME (16-bit, LE in RAM)
 game_id:        .res 2       ; assigned by WELCOME (16-bit, LE in RAM)
+player_count:   .res 1       ; total players (WELCOME @4)
+conn_state:     .res 1       ; CONN_* connection state
 observed_hash:  .res 8       ; last GAME_STATE hash, echoed in PLAY/DRAW
 hash_valid:     .res 1       ; 1 once a state hash has been captured
 
@@ -127,11 +134,29 @@ connect_fail:
     jsr rubp_validate
     bcs no_data
 
-    ; Process based on message type
+    ; Dispatch on message type
     jsr get_message_type
+    cmp #MSG_WELCOME
+    bne not_welcome
+    jsr parse_welcome
+    jmp redraw
+not_welcome:
+    cmp #MSG_GAME_START
+    bne not_start
+    lda #0                  ; replace hand
+    jsr parse_cards
+    jmp redraw
+not_start:
+    cmp #MSG_CARD_DRAWN
+    bne not_drawn
+    lda #1                  ; append to hand
+    jsr parse_cards
+    jmp redraw
+not_drawn:
     cmp #MSG_GAME_STATE
     bne no_data
-    jsr process_game_state
+    jsr parse_game_state
+redraw:
     jsr render_game
 
 no_data:

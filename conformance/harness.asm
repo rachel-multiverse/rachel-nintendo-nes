@@ -33,7 +33,20 @@ hash_valid    = $038E
 hand_count    = $038F
 hand_cards    = $0390       ; 20
 hand_selected = $03A4       ; 20
+hand_cursor   = $03B8
+player_count  = $03B9
+conn_state    = $03BA
+current_turn  = $03BB
+direction     = $03BC
+discard_top   = $03BD
+current_suit  = $03BE
+draw_count    = $03BF
+deck_count    = $03C0
+player_counts = $03C1       ; 8
+game_over     = $03C9
+winner_index  = $03CA
 
+temp1         = $10         ; zero-page scratch used by parse_cards
 cap_ptr       = $02         ; zero-page scratch pointer for the capture copy
 
 CAP_HELLO = $0500

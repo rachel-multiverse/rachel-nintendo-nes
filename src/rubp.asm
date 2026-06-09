@@ -242,6 +242,119 @@ invalid:
     rts
 .endproc
 
+; -----------------------------------------------------------------------------
+; Parse WELCOME (0x02)
+; Payload: AssignedPlayerID@0 (BE), GameID@2 (BE), PlayerCount@4, GameState@5,
+;          SpecVersion@6 (BE). Stores the IDs (little-endian in RAM) and the
+;          player count, and advances to the WAITING connection state.
+; -----------------------------------------------------------------------------
+.proc parse_welcome
+    ; AssignedPlayerID (big-endian on the wire)
+    lda net_buffer_rx+PAYLOAD_START+1
+    sta player_id+0
+    lda net_buffer_rx+PAYLOAD_START+0
+    sta player_id+1
+    ; GameID (big-endian)
+    lda net_buffer_rx+PAYLOAD_START+3
+    sta game_id+0
+    lda net_buffer_rx+PAYLOAD_START+2
+    sta game_id+1
+    ; Player count
+    lda net_buffer_rx+PAYLOAD_START+4
+    sta player_count
+    ; Connection state
+    lda #CONN_WAITING
+    sta conn_state
+    rts
+.endproc
+
+; -----------------------------------------------------------------------------
+; Parse GAME_STATE (0x07) — the public state summary.
+; Captures the fields the UI needs and, when Flags bit0 says a state hash is
+; present, latches the 8-byte hash into observed_hash so the next PLAY/DRAW
+; echoes it. GAME_STATE carries no hand; cards arrive via GAME_START /
+; CARD_DRAWN (parse_cards).
+; -----------------------------------------------------------------------------
+.proc parse_game_state
+    lda net_buffer_rx+PAYLOAD_START+0   ; CurrentPlayer
+    sta current_turn
+    lda net_buffer_rx+PAYLOAD_START+1   ; Direction
+    sta direction
+    lda net_buffer_rx+PAYLOAD_START+2   ; TopCard
+    sta discard_top
+    lda net_buffer_rx+PAYLOAD_START+3   ; NominatedSuit
+    sta current_suit
+    lda net_buffer_rx+PAYLOAD_START+4   ; PendingDraws
+    sta draw_count
+    lda net_buffer_rx+PAYLOAD_START+6   ; DeckCount
+    sta deck_count
+
+    ; PlayerCardCounts @7..14
+    ldx #0
+:   lda net_buffer_rx+PAYLOAD_START+7,x
+    sta player_counts,x
+    inx
+    cpx #8
+    bne :-
+
+    lda net_buffer_rx+PAYLOAD_START+15  ; IsGameOver
+    sta game_over
+    lda net_buffer_rx+PAYLOAD_START+16  ; WinnerIndex
+    sta winner_index
+
+    ; StateHash @24..31, present only when Flags(@23) bit0 is set.
+    lda net_buffer_rx+PAYLOAD_START+23
+    and #$01
+    beq no_hash
+    ldx #0
+:   lda net_buffer_rx+PAYLOAD_START+24,x
+    sta observed_hash,x
+    inx
+    cpx #8
+    bne :-
+    lda #1
+    sta hash_valid
+no_hash:
+    rts
+.endproc
+
+; -----------------------------------------------------------------------------
+; Parse GAME_START (0x03) / CARD_DRAWN (0x06) — both carry a private hand.
+; Payload: CardCount@0, Cards@1.. . A = 0 replaces the hand (GAME_START);
+; A != 0 appends (CARD_DRAWN). The hand is clamped to its 20-card capacity.
+; -----------------------------------------------------------------------------
+.proc parse_cards
+    tay                     ; A = mode; 0 = replace
+    bne append
+    ; Replace: start a fresh hand and clear selection/cursor.
+    lda #0
+    sta hand_count
+    sta hand_cursor
+    ldx #0
+:   sta hand_selected,x
+    inx
+    cpx #20
+    bne :-
+append:
+    lda net_buffer_rx+PAYLOAD_START+0   ; cards in this message
+    sta temp1
+    ldx hand_count          ; destination index
+    ldy #0                  ; source index
+copy:
+    cpy temp1
+    beq done
+    cpx #20                 ; stop at hand capacity
+    beq done
+    lda net_buffer_rx+PAYLOAD_START+1,y
+    sta hand_cards,x
+    inx
+    iny
+    jmp copy
+done:
+    stx hand_count
+    rts
+.endproc
+
 .segment "RODATA"
 
 player_name:

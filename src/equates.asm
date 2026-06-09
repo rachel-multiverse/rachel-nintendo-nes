@@ -39,11 +39,21 @@ BTN_RIGHT   = %00000001
 ; RUBP Protocol
 RUBP_VERSION    = 1
 MSG_HELLO       = $01
-MSG_GAME_STATE  = $07
+MSG_WELCOME     = $02       ; H->C: slot assigned
+MSG_GAME_START  = $03       ; H->C: initial hand (private)
 MSG_PLAY_CARD   = $04
 MSG_DRAW_CARD   = $05
+MSG_CARD_DRAWN  = $06       ; H->C: cards just drawn (private)
+MSG_GAME_STATE  = $07
 PAYLOAD_START   = 16
 PAYLOAD_SIZE    = 48
+
+; Connection state (shared semantics with the C64 client)
+CONN_DISCONNECTED = 0
+CONN_DIALING      = 1
+CONN_HANDSHAKE    = 2
+CONN_WAITING      = 3       ; got WELCOME, waiting for GAME_START
+CONN_PLAYING      = 4
 
 ; RachelSpec version this client speaks (negotiated via HELLO/WELCOME)
 SPEC_VERSION_HI = $00

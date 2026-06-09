@@ -5,44 +5,8 @@
 
 .segment "CODE"
 
-; -----------------------------------------------------------------------------
-; Process game state from network
-; -----------------------------------------------------------------------------
-.proc process_game_state
-    ldx #0
-    lda net_buffer_rx+PAYLOAD_START
-    sta current_turn
-    lda net_buffer_rx+PAYLOAD_START+1
-    sta my_index
-    lda net_buffer_rx+PAYLOAD_START+2
-    sta discard_top
-    lda net_buffer_rx+PAYLOAD_START+3
-    sta current_suit
-    lda net_buffer_rx+PAYLOAD_START+4
-    sta draw_count
-    lda net_buffer_rx+PAYLOAD_START+5
-    sta hand_count
-
-    ; Copy hand cards
-    ldx #0
-:   lda net_buffer_rx+PAYLOAD_START+6,x
-    sta hand_cards,x
-    inx
-    cpx #20
-    bne :-
-
-    ; Clear selection
-    ldx #0
-    lda #0
-:   sta hand_selected,x
-    inx
-    cpx #20
-    bne :-
-
-    lda #0
-    sta hand_cursor
-    rts
-.endproc
+; GAME_STATE / WELCOME / hand decoding lives in rubp.asm (parse_game_state,
+; parse_welcome, parse_cards). This module owns rendering and input only.
 
 ; -----------------------------------------------------------------------------
 ; Render game screen
